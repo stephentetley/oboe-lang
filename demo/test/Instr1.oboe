@@ -1,0 +1,20 @@
+
+
+# Csound instruments need both a number and a _definition_.
+# fields: [num] & [main]
+# [orch] is a special identifier 
+
+
+orch = 
+    { a = instr101
+    };
+
+instr101 = algo101 @ { num = 101 };
+
+
+algo101 = 
+    { main = do { asig <- oscil(0.8, 440.0, 1)
+                ; out(asig)
+                }
+    };
+
