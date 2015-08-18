@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  OchreLang.FormTrans
--- Copyright   :  (c) Stephen Tetley 2014
+-- Copyright   :  (c) Stephen Tetley 2015
 -- License     :  BSD3
 --
 -- Maintainer  :  stephen.tetley@gmail.com
@@ -51,14 +51,20 @@ initial_env = Map.empty
 
 
 translate :: F.Program -> Compiler Program
-translate (F.Program { F.prog_orch = orch
-                     , F.prog_root_form = root }) =
-    Program <$> transOrch orch <*> transForm root
+translate (F.Program { F.prog_root_form = root }) =
+    Program <$> transOrch root <*> transForm root
 
+
+transOrch :: F.Form -> Compiler [Instrument]
+transOrch _ = error "transOrch - failure"
+
+{-
 transOrch :: F.OrchDict -> Compiler [Instrument]
 transOrch = mapM (uncurry fn) . IntMap.toAscList 
   where
     fn ix rhs = Instrument ix <$> instrRhs rhs 
+-}
+
 
 transForm :: F.Form -> Compiler Form
 transForm (F.Form binds) = Form <$> T.mapM transBindingRhs binds
@@ -96,8 +102,6 @@ transBindingRhs (F.BindsP _ _)          =
     throwError "FormTrans.transBindingRhs"
                "Cannot translate a pure function binding."
 
-transBindingRhs (F.BindsF fm)           = BindsF <$> transForm fm
-
 
 instantiateArgs :: NameEnv -> [Ident] -> Compiler ([VarId], NameEnv)
 instantiateArgs env []     = return $ ([],env)
@@ -117,7 +121,7 @@ transDoBlock env (z:zs) = step z zs
     -- Ignore return if not in final position
     step (F.Return _)               (x:xs)  = step x xs
 
-
+{-
     -- Top level prim call can either be super-call, opcode call or letfun call    
     step (F.PrimCall vid es)        []      = 
         constrXCall env vid <$> mapM (exprValue env) es
@@ -128,7 +132,7 @@ transDoBlock env (z:zs) = step z zs
            ; let fn = constrXCall env vid
            ; return $ fn vs :>> e2
            }
-
+-}
     -- Bind cannot be last statement in a do-block
     step (F.DoBind _ _)             []      =
         throwError "ToplevelTrans.transDoBlock"
@@ -224,12 +228,14 @@ exprValue env (F.Var vid)         = case find vid env of
 
 exprValue _   (F.FormRef v)       = pure $ FormRefV v
 
+{-
 -- | This must be a Csound function (e.g. abs).
--- It cannot be a Csound opcode or a (pre-inlining) Ochre method
--- (Ochre methods are not pure).
+-- It cannot be a Csound opcode or a (pre-inlining) Oboe method
+-- (Oboe methods are not pure).
 --
 exprValue env (F.App vid es)      =
     FunCallV vid <$> mapM (exprValue env) es
+-}
 
 exprValue env (F.Cond ce e1 e2)   =
     CondV <$> exprValue env ce <*> exprValue env e1 <*> exprValue env e2

@@ -3,14 +3,15 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  OboeLang.FormSyntax
--- Copyright   :  (c) Stephen Tetley 2014
+-- Copyright   :  (c) Stephen Tetley 2015
 -- License     :  BSD3
 --
 -- Maintainer  :  stephen.tetley@gmail.com
 -- Stability   :  unstable
 -- Portability :  GHC
 --
--- Syntax with forms /normalized/.
+-- Syntax with modules reduced to forms 
+-- (all code loaded)
 --
 --------------------------------------------------------------------------------
 
@@ -18,7 +19,6 @@ module OboeLang.FormSyntax
   (
    
     Program(..)
-  , OrchDict
   , Form(..)
   , Bindings
   , BindingRhs(..)
@@ -49,18 +49,13 @@ import OboeLang.Utils.PrettyExprH98
 
 import Text.PrettyPrint.HughesPJ                -- package: pretty
 
-import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 
 -- orch ?
 data Program = Program
-     { prog_orch                :: OrchDict
-     , prog_root_form           :: Form
+     { prog_root_form           :: Form
      }
   deriving (Eq,Show)
-
-
-type OrchDict = IntMap.IntMap BindingRhs
 
 
 
@@ -71,7 +66,6 @@ type Bindings = Map.Map Ident BindingRhs
 
 data BindingRhs = BindsM [Ident] DoBlock 
                 | BindsP [Ident] Expr
-                | BindsF Form
   deriving (Eq,Show)
 
 
@@ -84,7 +78,7 @@ type DoBlock = [Stmt]
 -- expressions.
 --
 data Stmt = Return    Expr
-          | PrimCall  Ident     [Expr]
+          | Call      Expr     [Expr]
           | DoBind    VarBind   DoBlock
           | DoLet     Decl
           | DoLam     Ident     [Ident]   DoBlock
@@ -111,15 +105,17 @@ data Decl = Decl Ident Expr
 -- positional and hence not modular. We synthesize them from the 
 -- orchestra spec later in compilation.
 -- 
-data Expr = Lit     Literal
-          | Var     Ident
-          | FormRef Ident             -- FromRef?
-          | App     Ident     [Expr]
-          | Cond    Expr      Expr      Expr
-          | UnaryE  UnaryOp   Expr
-          | BinE    BinOp     Expr      Expr
-          | RelE    RelOp     Expr      Expr
-          | Tuple   [Expr]
+data Expr = Lit         Literal
+          | Var         Ident
+          | FormRef     Ident             -- FromRef?
+          | App         Expr      [Expr]
+          | Cond        Expr      Expr      Expr
+          | UnaryE      UnaryOp   Expr
+          | BinE        BinOp     Expr      Expr
+          | RelE        RelOp     Expr      Expr
+          | Tuple       [Expr]
+          | PrimForm    Bindings
+          | FormExtend  Expr      Expr
   deriving (Eq,Show)
 
 
@@ -135,44 +131,22 @@ data Literal = Bool     Bool
 --------------------------------------------------------------------------------
 -- Pretty printing
 
+
 instance Pretty Program where
-  pretty (Program { prog_orch      = orch
-                  , prog_root_form = root }) = 
-    ppOrchDict orch $+$ namedForm (Ident "Root") root
-
-ppOrchDict :: OrchDict -> Doc
-ppOrchDict dict = 
-    text "orch" <+> char '=' 
-      $+$ blockSemiBraces LEAD_SEP (map (uncurry fn) $ IntMap.toAscList dict)
-  where
-   fn ix rhs = int ix <+> char '=' <+> pretty rhs
-
-
-
-namedForm :: Ident -> Form -> Doc
-namedForm vid fm = 
-    pretty vid <+> char '=' $+$ nest 2 (pretty fm)
+  pretty (Program fm) = pretty fm
 
 instance Pretty Form where
   pretty (Form binds) = blockSemiBraces LEAD_SEP $ map ppBinding $ Map.toAscList binds
 
 ppBinding :: (Ident,BindingRhs) -> Doc
-ppBinding (vid,body) 
-    | isForm body = text "def" <+> pretty vid 
-                               <+> char '=' <+> pretty body
-    | otherwise   = pretty vid <+> char '=' <+> pretty body
+ppBinding (vid,body) = pretty vid <+> char '=' <+> pretty body
 
 
-
-isForm :: BindingRhs -> Bool
-isForm (BindsF {}) = True
-isForm _           = False
 
 
 instance Pretty BindingRhs where
   pretty (BindsM args body) = bindingRhsBody args (ppDoBlock body)
   pretty (BindsP args body) = bindingRhsBody args (pretty body)
-  pretty (BindsF body)      = pretty body
 
 
 bindingRhsBody :: [Ident] -> Doc -> Doc
@@ -191,7 +165,7 @@ ppDoBlock xs                    = text "do" <+> blockSemiBraces1 LEAD_SEP (map p
 
 instance Pretty Stmt where
   pretty (Return e)               = text "return" <+> pretty e
-  pretty (PrimCall v es)          = pretty v <+> commaSep (map pretty es)
+  pretty (Call e es)              = pretty e <+> commaSep (map pretty es)
   pretty (DoBind a de)            = ppVarBind a <+> text "<-" <+> ppDoBlock de
   pretty (DoLet d)                = text "let" <+> pretty d
   pretty (DoLam s args de)        = 
@@ -214,7 +188,7 @@ exprDoc :: Expr -> DocE
 exprDoc (Lit v)                 = Atom $ pretty v
 exprDoc (Var s)                 = Atom $ pretty s
 exprDoc (FormRef s)             = Atom $ pretty s
-exprDoc (App s es)              = funAppB (exprDoc (Var s)) (map exprDoc es)
+exprDoc (App e es)              = funAppB (exprDoc e) (map exprDoc es)
 exprDoc (Cond c e1 e2)          = 
     Atom $ text "cond" <+> pretty c <+> char ':' <+> pretty e1
                                     <+> char '?' <+> pretty e2
@@ -223,6 +197,14 @@ exprDoc (UnaryE op e)           = unaryDocE op (exprDoc e)
 exprDoc (BinE op e1 e2)         = binDocE op (exprDoc e1) (exprDoc e2)
 exprDoc (RelE relop e1 e2)      = relDocE relop (exprDoc e1) (exprDoc e2)
 exprDoc (Tuple es)              = Atom $ tupled (map pretty es) 
+
+exprDoc (PrimForm bm)           = 
+    let bs = Map.toAscList bm in 
+    Atom $ nest 2 (blockSemiBraces1 LEAD_SEP (map ppBinding bs))
+
+-- TODO needs priority level and operator printing...
+exprDoc (FormExtend f1 f2)      = 
+    Atom $ pretty f1 <+> char '@' <+> pretty f2 
 
 
 instance Pretty Literal where
@@ -259,7 +241,11 @@ extends fa (x:xs) = extends (extend fa x) xs
 find :: Ident -> Form -> Maybe BindingRhs
 find name (Form b) = Map.lookup name b
 
+
+
 recfind :: [Ident] -> Form -> Maybe BindingRhs
+recfind _  _        = error "recfind - failure"
+{-
 recfind xs (Form z) = work xs z
   where
     work []     _   = Nothing
@@ -267,3 +253,5 @@ recfind xs (Form z) = work xs z
     work (y:ys) b   = case Map.lookup y b of
                          Just (BindsF (Form c)) -> work ys c
                          _ -> Nothing
+
+-}
