@@ -9,9 +9,10 @@ import OboeLang.Parser
 import OboeLang.TopSyntax
 import OboeLang.Utils.Pretty
 
+import System.Environment
 
 opts :: Options
-opts = default_options { opt_builtins_loc = "test/oboe.builtins"
+opts = default_options { opt_corelibs_loc = "../core_lib/csound"
                        , opt_search_path  = "test"
                        , opt_ddump_flags  = [DDUMP_PARSED, DDUMP_FORMS, DDUMP_INLINE]
                        , opt_verbose      = False }
@@ -27,3 +28,6 @@ demo02 = do
       Right mod1 -> do { print $ pretty mod1
                        ; print mod1
                        }
+
+-- returns ghc path when used from ghci
+test01 = print =<< getExecutablePath

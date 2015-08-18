@@ -20,7 +20,8 @@ module OboeLang.CompilerMon
   ( 
 
     ErrMsg
-  , SearchPath
+  , SearchPaths
+  , makeSearchPaths
   , DDumpOpt(..)
   , Config
   , makeConfig
@@ -46,8 +47,6 @@ module OboeLang.CompilerMon
 
   , queryDDumpOpt
 
-  , withBuiltins
-
   , throwError
 
   , tellDoc
@@ -71,7 +70,11 @@ import qualified Data.Set as Set
 type ErrMsg = String
 
 
-type SearchPath = String
+newtype SearchPaths = SearchPaths { getSearchPaths :: [FilePath] }
+  deriving (Eq,Show)
+
+makeSearchPaths :: String -> SearchPaths
+makeSearchPaths = SearchPaths . splitOn ":"
 
 
 -- | Note - may need extending for to account for Zak \"ports\".
@@ -115,23 +118,21 @@ data DDumpOpt = DDUMP_PARSED
 -- Use @withBuiltins@ when the are avaiable.
 data Config = Config
     { cfg_optimze_pass_count    :: !Int
-    , cfg_search_paths          :: [FilePath]
-    , cfg_builtins              :: BuiltinDict
+    , cfg_corelibs_path         :: FilePath
+    , cfg_search_paths          :: SearchPaths
     , cfg_verbose               :: Bool
     , cfg_ddump                 :: Set.Set DDumpOpt
     }
 
 
-makeConfig :: Int -> SearchPath -> [DDumpOpt] -> Bool -> Config
-makeConfig i ss dopts verbo = Config 
+makeConfig :: Int -> String -> FilePath -> [DDumpOpt] -> Bool -> Config
+makeConfig i ss coreloc dopts verbo = Config 
     { cfg_optimze_pass_count    = i
-    , cfg_search_paths          = paths 
-    , cfg_builtins              = Map.empty
+    , cfg_corelibs_path         = coreloc
+    , cfg_search_paths          = makeSearchPaths ss 
     , cfg_ddump                 = Set.fromList dopts
     , cfg_verbose               = verbo
     }
-  where
-    paths = splitOn ":" ss 
 
 
 
@@ -233,15 +234,17 @@ askPassCount :: Compiler Int
 askPassCount = asksCfg cfg_optimze_pass_count
 
 
-
 askBuiltinNames :: Compiler [Ident]
+askBuiltinNames = return []
+
+{-
 askBuiltinNames = asksCfg (fn . cfg_builtins)
   where
     fn = Map.keys
-
+-}
 
 askSearchPaths :: Compiler [FilePath]
-askSearchPaths = asksCfg cfg_search_paths
+askSearchPaths = getSearchPaths <$> asksCfg cfg_search_paths
 
 
 queryDDumpOpt :: DDumpOpt -> Compiler Bool
@@ -252,8 +255,6 @@ queryDDumpOpt opt =
 local :: (Config -> Config) -> Compiler a -> Compiler a
 local f ma = CM $ \r s -> getCM ma (f r) s
 
-withBuiltins :: [Builtin] -> Compiler a -> Compiler a
-withBuiltins bs = local (\cfg -> cfg { cfg_builtins = makeBuiltinDict bs })
 
 
 throwError :: String -> String -> Compiler a

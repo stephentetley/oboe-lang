@@ -232,6 +232,9 @@ expression9 =  pCond
                  <*> (reservedOp ":"  *> expression)
 
 
+
+-- Dot operator (...) in Ocaml has higher precedence than applicatiction
+--
 expression10 :: OboeParser Expr
 expression10 = go <$> primitiveExpression 
                   <*> optionMaybe (optionEither funBody derefBody)
@@ -242,8 +245,6 @@ expression10 = go <$> primitiveExpression
     go e1 (Just body) = case body of { Left args -> App e1 args
                                      ; Right name -> FormDeref e1 name }
 
-
--- Dot operator (...) in Ocaml has higher precedence than applicatiction
 
 primitiveExpression :: OboeParser Expr 
 primitiveExpression = 
@@ -260,13 +261,6 @@ parensExpr = disamb <$> parens (commaSep expression)
     disamb [e] = e
     disamb es  = Tuple es
 
-{-
-varOrProjection :: OboeParser Expr
-varOrProjection = go <$> ident <*> many (reservedOp "." *> ident)
-  where
-    go x [] = Var x
-    go x xs = FormDeref (init $ x:xs) (last xs)
--}
 
 variableExpr :: OboeParser Expr
 variableExpr = Var <$> ident

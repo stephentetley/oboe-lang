@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  OboeLang.ModuleIO
--- Copyright   :  (c) Stephen Tetley 2014
+-- Copyright   :  (c) Stephen Tetley 2015
 -- License     :  BSD3
 --
 -- Maintainer  :  stephen.tetley@gmail.com
@@ -35,9 +35,8 @@ import System.Directory
 import System.FilePath
 import Text.Printf
 
-loadProgram :: FilePath -> FilePath 
-            -> Compiler ([Builtin],Program)
-loadProgram _ _ = error "loadProgram"
+loadProgram :: FilePath -> Compiler (Program)
+loadProgram _ = error "loadProgram"
 
 {-
 

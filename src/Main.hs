@@ -42,7 +42,7 @@ data Options = Options
     { opt_show_help             :: Bool
     , opt_search_path           :: String
     , opt_optimize_count        :: Int
-    , opt_builtins_loc          :: FilePath
+    , opt_corelibs_loc          :: FilePath
     , opt_ddump_flags           :: [DDumpOpt]
     , opt_verbose               :: Bool
     , opt_output_file           :: FilePath
@@ -54,7 +54,7 @@ default_options = Options
     { opt_show_help             = False
     , opt_search_path           = ""
     , opt_optimize_count        = 5
-    , opt_builtins_loc          = ""
+    , opt_corelibs_loc          = ""
     , opt_ddump_flags           = []
     , opt_verbose               = False
     , opt_output_file           = ""
@@ -62,8 +62,8 @@ default_options = Options
 
 transOptions :: Options -> OC.CompilerOpts
 transOptions opts = 
-    OC.CompilerOpts { OC.opt_search_path     = opt_search_path opts
-                    , OC.opt_builtins_loc    = opt_builtins_loc opts
+    OC.CompilerOpts { OC.opt_userlib_paths   = opt_search_path opts
+                    , OC.opt_corelibs_path   = opt_corelibs_loc opts
                     , OC.opt_optimize_count  = opt_optimize_count opts
                     , OC.opt_verbose         = opt_verbose opts
                     , OC.opt_ddump_flags     = opt_ddump_flags opts
@@ -77,8 +77,8 @@ type OptionsS = Options -> Options
 
 options :: [OptDescr OptionsS]
 options =
-    [ Option ['b'] ["builtins"] 
-                   (ReqArg builtinsS "BUILTINS")     "builtins"
+    [ Option ['c'] ["corelibs"] 
+                   (ReqArg corelibsS "CORELIBS_PATH")     "corelibs path"
 
     , Option []    ["ddump-parsed"] 
                    (NoArg (ddumpS DDUMP_PARSED))   "debug dump after parsing"
@@ -109,8 +109,8 @@ ddumpS opt o        = let ss = opt_ddump_flags o in o { opt_ddump_flags = opt:ss
 importsS            :: String -> OptionsS
 importsS s o        = o { opt_search_path = s }
 
-builtinsS           :: String -> OptionsS
-builtinsS s o       = o { opt_builtins_loc = s }
+corelibsS           :: String -> OptionsS
+corelibsS s o       = o { opt_corelibs_loc = s }
 
 
 outputS             :: FilePath -> OptionsS

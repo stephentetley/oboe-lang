@@ -56,10 +56,13 @@ import System.FilePath
 import Prelude hiding ( log )
 
 
-
+-- | Need a notion of user libs otherwise there isn\'t much 
+-- point going for advance module system if users can\'t make 
+-- their own modules.
+--
 data CompilerOpts = CompilerOpts
-    { opt_search_path           :: SearchPath
-    , opt_builtins_loc          :: FilePath
+    { opt_corelibs_path         :: FilePath
+    , opt_userlib_paths         :: String
     , opt_optimize_count        :: Int
     , opt_verbose               :: Bool
     , opt_ddump_flags           :: [DDumpOpt]
@@ -74,22 +77,22 @@ compile = flip runCompile
 -- Potentially should support something like GHC\'s -ddump-pass
 
 runCompile :: FilePath -> CompilerOpts -> IO ()
-runCompile main_path (CompilerOpts { opt_search_path    = searches
-                                   , opt_builtins_loc   = builtins_path
+runCompile main_path (CompilerOpts { opt_corelibs_path  = corelibs_path
+                                   , opt_userlib_paths  = user_paths
                                    , opt_optimize_count = pc
                                    , opt_verbose        = verbo
                                    , opt_ddump_flags    = dd_flags 
                                    , opt_output_file    = out1 }) = 
     do { (log,ans) <- runCompilerMonad config $ 
-                        do { (builts,prgm) <- loadProgram builtins_path main_path
-                           ; withBuiltins builts (compileProgram prgm)
+                        do { prgm <- loadProgram main_path
+                           ; compileProgram prgm
                            }
        ; case ans of
            Left err -> putStrLn log >> exitWithErr err
            Right a -> putStrLn log >> writeFile outpath (render $ pretty a)
        }
   where
-    config = makeConfig pc searches dd_flags verbo
+    config = makeConfig pc user_paths corelibs_path dd_flags verbo
     exitWithErr err = do { putStrLn err; exitWith $ ExitFailure (-1) }
     outpath = if null out1 then (replaceExtension main_path "orc") else out1
 
