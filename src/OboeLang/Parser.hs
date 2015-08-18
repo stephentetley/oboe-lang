@@ -234,19 +234,20 @@ expression9 =  pCond
 
 expression10 :: OboeParser Expr
 expression10 = go <$> primitiveExpression 
-                  <*> optionMaybe (parens $ commaSep primitiveExpression)
+                  <*> optionMaybe (optionEither funBody derefBody)
   where
+    funBody           = parens $ commaSep primitiveExpression
+    derefBody         = reservedOp "." *> ident
     go e1 Nothing     = e1
-    go e1 (Just args) = App e1 args 
+    go e1 (Just body) = case body of { Left args -> App e1 args
+                                     ; Right name -> FormDeref e1 name }
 
--- Record projection is treated as a indetifier and resolved later.
--- This is a bad hack - cannot project on anonymous records, but
--- it is good enough for now.
 
+-- Dot operator (...) in Ocaml has higher precedence than applicatiction
 
 primitiveExpression :: OboeParser Expr 
 primitiveExpression = 
-    literalExpr <|> formExpr <|> parensExpr <|> varOrProjection
+    literalExpr <|> formExpr <|> parensExpr <|> variableExpr
 
 
 formExpr :: OboeParser Expr
@@ -259,12 +260,13 @@ parensExpr = disamb <$> parens (commaSep expression)
     disamb [e] = e
     disamb es  = Tuple es
 
-
+{-
 varOrProjection :: OboeParser Expr
 varOrProjection = go <$> ident <*> many (reservedOp "." *> ident)
   where
     go x [] = Var x
-    go x xs = FormRef (init $ x:xs) (last xs)
+    go x xs = FormDeref (init $ x:xs) (last xs)
+-}
 
 variableExpr :: OboeParser Expr
 variableExpr = Var <$> ident
@@ -375,8 +377,9 @@ oboe_def = emptyDef
     { P.commentLine       = "#"
     , P.identStart        = letter
     , P.identLetter       = alphaNum <|> oneOf "_"
-    , P.reservedOpNames   = [ "&", "<-", "=", "*"
-                            , "/", "+", "-", "@"
+    , P.reservedOpNames   = [ ".", "@" 
+                            , "&", "<-", "=", "*"
+                            , "/", "+", "-"
                             , ":", "\\", "->"
                             ]  
     , P.reservedNames     = [ "load", "loadCore"

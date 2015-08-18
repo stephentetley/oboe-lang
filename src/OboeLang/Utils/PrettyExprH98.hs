@@ -37,7 +37,7 @@ module OboeLang.Utils.PrettyExprH98
   -- ** Precedence 10
   , funAppB1
   , funAppB
-
+  , formDerefB
 
   -- ** Precedence 9
   , listIndexB
@@ -64,6 +64,7 @@ module OboeLang.Utils.PrettyExprH98
   -- ** Precedence 5
   , consB
   , concatB
+  , genConcatB
 
   -- ** Precedence 4
   , equalB
@@ -120,6 +121,9 @@ funAppB d []            = d
 funAppB d [e]           = d `funAppB1` e
 funAppB d (e:es)        = d `funAppB1` e `funAppB` es
 
+
+formDerefB              :: DocE -> String -> DocE
+formDerefB d s          = Binary (infixL 10) (noSpace ".") d (Atom $ text s)
 
 {-
 
@@ -276,6 +280,13 @@ consB                   = Binary (infixR 5) (noSpace ":")
 concatB                 :: DocE -> DocE -> DocE
 concatB                 = Binary (infixR 5) (noSpace "++")
 
+
+-- | Concatenation operator (Lists).
+-- 
+-- > ++ (infixr 5)
+--
+genConcatB              :: String -> DocE -> DocE -> DocE
+genConcatB op           = Binary (infixR 5) (noSpace op)
 
 --------------------------------------------------------------------------------
 -- Precedence 4

@@ -44,7 +44,6 @@ import OboeLang.Utils.Common ( truncatedDouble )
 
 import Text.PrettyPrint.HughesPJ                -- package: pretty
 
-import Data.List ( intercalate )
 
 data Program = Program
      { prog_main                :: Module
@@ -119,7 +118,6 @@ data Decl = Decl Ident Expr
 -- 
 data Expr = Lit         Literal
           | Var         Ident
-          | FormRef     [Ident]   Ident
           | App         Expr      [Expr]
           | Cond        Expr      Expr      Expr
           | UnaryE      UnaryOp   Expr
@@ -129,6 +127,7 @@ data Expr = Lit         Literal
           | PrimForm    [Binding]
           | FormLoad    LoadDirective String
           | FormExtend  Expr      Expr
+          | FormDeref   Expr      Ident
   deriving (Eq,Show)
 
 
@@ -220,7 +219,6 @@ instance Pretty Expr where
 exprDoc :: Expr -> DocE
 exprDoc (Lit v)                 = Atom $ pretty v
 exprDoc (Var s)                 = Atom $ pretty s
-exprDoc (FormRef ss s)          = Atom $ text $ formProjection (ss,s)
 
 exprDoc (App vid es)            = 
     Atom $ pretty vid <> parens (commaSep $ map pretty es)
@@ -241,26 +239,14 @@ exprDoc (FormLoad d name)       = Atom $ case d of
     LOAD_CORE -> text "loadCore" <> parens (doubleQuotes $ text name)
     LOAD_USER -> text "load"     <> parens (doubleQuotes $ text name)
 
--- TODO needs priority level and operator printing...
-exprDoc (FormExtend f1 f2)      = 
-    Atom $ pretty f1 <+> char '@' <+> pretty f2 
+exprDoc (FormExtend f1 f2)      = genConcatB "@" (exprDoc f1) (exprDoc f2)
 
+exprDoc (FormDeref e s)         = formDerefB (exprDoc e) (getIdent s)
 
 instance Pretty Literal where
-  pretty (Bool b)              = text $ show b
-  pretty (Int i)               = int i
-  pretty (Float d)             = text $ truncatedDouble $ realToFrac d
-  pretty (String s)            = doubleQuotes $ text s
+  pretty (Bool b)               = text $ show b
+  pretty (Int i)                = int i
+  pretty (Float d)              = text $ truncatedDouble $ realToFrac d
+  pretty (String s)             = doubleQuotes $ text s
 
-
-
---------------------------------------------------------------------------------
--- Operations
-
-formProjection :: ([Ident],Ident) -> String
-formProjection = expand . merge . deIdent
-  where
-    deIdent (xs,x)  = (map getIdent xs, getIdent x)
-    merge (xs,x)    = xs ++ [x]
-    expand          = intercalate "."
 
