@@ -44,6 +44,7 @@ module OboeLang.CompilerMon
   , askPassCount
   , askBuiltinNames
   , askSearchPaths
+  , askCoreLibsPath
 
   , queryDDumpOpt
 
@@ -234,17 +235,15 @@ askPassCount :: Compiler Int
 askPassCount = asksCfg cfg_optimze_pass_count
 
 
+-- TODO - not sure builtins are special...
 askBuiltinNames :: Compiler [Ident]
 askBuiltinNames = return []
 
-{-
-askBuiltinNames = asksCfg (fn . cfg_builtins)
-  where
-    fn = Map.keys
--}
-
 askSearchPaths :: Compiler [FilePath]
 askSearchPaths = getSearchPaths <$> asksCfg cfg_search_paths
+
+askCoreLibsPath :: Compiler FilePath
+askCoreLibsPath = asksCfg cfg_corelibs_path
 
 
 queryDDumpOpt :: DDumpOpt -> Compiler Bool

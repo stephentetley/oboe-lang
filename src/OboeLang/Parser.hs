@@ -30,14 +30,21 @@ import qualified Text.Parsec.Token as P
 
 import Control.Monad.Identity
 import System.Directory
-import System.FilePath ( takeBaseName ) 
+
 
 type OboeParser a       = ParsecT String () Identity a
 type OboeLexer          = P.GenTokenParser String () Identity
 
-parseModule :: FilePath -> IO (Either ParseError Module)
-parseModule path = 
-    let name = moduleName path in safeParseFromFile (whiteSpace >> oboeModule name) path
+parseModule :: FilePath -> ModuleName -> IO (Either ParseError Module)
+parseModule prefix modname = 
+    let path = moduleFilePath prefix modname in 
+    safeParseFromFile (whiteSpace >> oboeModule modname) path
+
+parseRootModule :: FilePath -> IO (Either ParseError Module)
+parseRootModule path = 
+    let modname = maybe (error "parseRootModule - unreachable") id $ makeModuleName "main" in
+    safeParseFromFile (whiteSpace >> oboeModule modname) path
+
 
 safeParseFromFile :: Parser a -> FilePath -> IO (Either ParseError a)
 safeParseFromFile p file_path = do 
@@ -51,18 +58,13 @@ safeParseFromFile p file_path = do
 
 
 
-oboeModule :: Ident -> OboeParser Module
+oboeModule :: ModuleName -> OboeParser Module
 oboeModule name = 
     (\binds -> Module { module_name = name
                       , module_binds = binds })
       <$> sepEndBy topBinding semi
 
 
-moduleName :: FilePath -> Ident
-moduleName = Ident . takeBaseName
-
-
--- TODO - formVars exprVars...
 topBinding :: OboeParser TopBinding
 topBinding = explicitB <|> implicitB
   where
@@ -73,9 +75,17 @@ topBinding = explicitB <|> implicitB
 formLoadExpr :: OboeParser Expr
 formLoadExpr = loadCore <|> loadUser 
   where
-    loadCore = FormLoad LOAD_CORE <$> (reserved "loadCore" *> parens stringLiteral)
-    loadUser = FormLoad LOAD_USER <$> (reserved "load"     *> parens stringLiteral)
+    loadCore = FormLoad LOAD_CORE <$> (reserved "loadCore" *> parens moduleName)
+    loadUser = FormLoad LOAD_USER <$> (reserved "load"     *> parens moduleName)
 
+moduleName :: OboeParser ModuleName
+moduleName = stringLiteral >>= next
+  where
+    next ss = case makeModuleName ss of
+                   Nothing -> parserFail "moduleName - empty name"
+                   Just name -> return name
+
+  
 
 binding :: OboeParser Binding
 binding = simpleBinding

@@ -29,9 +29,9 @@ module OboeLang.SyntaxCommon
   , makeModuleName
   , makeModuleNameL
   , deconsModuleName
-  , ppModuleName
   , moduleNameString
   , moduleNameIdent
+  , moduleFilePath
 
   , VarId(..)
   , makeFinal
@@ -64,6 +64,7 @@ import Data.List.Split ( splitOn )              -- package: split
 
 import Data.Fixed
 import Data.List ( intercalate )
+import System.FilePath
 
 
 type Decimal = Fixed E9 
@@ -98,6 +99,9 @@ data ModuleName = ModuleName
     }
   deriving (Eq,Ord,Show)
 
+instance Pretty ModuleName where
+  pretty = text . moduleNameString 
+
 
 
 makeModuleName :: String -> Maybe ModuleName
@@ -116,10 +120,6 @@ deconsModuleName a = (module_scoped_prefix a, module_last a)
 
 
 
-ppModuleName :: ModuleName -> Doc
-ppModuleName = text . moduleNameString 
-
-
 moduleNameString :: ModuleName -> String
 moduleNameString = expand . merge . deconsModuleName
   where
@@ -128,6 +128,21 @@ moduleNameString = expand . merge . deconsModuleName
 
 moduleNameIdent :: ModuleName -> Ident
 moduleNameIdent = Ident . moduleNameString
+
+
+-- | Module names should be the same as file names except for 
+-- Main.
+--
+-- The Main file can have any name but the module name should 
+-- be Main.
+--
+moduleFilePath :: FilePath -> ModuleName -> FilePath
+moduleFilePath path_root mod_name = 
+    normalise $ path_root `combine` (makeSuffix $ deconsModuleName mod_name)
+  where
+    makeSuffix (xs,x)    = let front = joinPath xs; back = x <.> "oboe" 
+                           in front `combine` back
+
 
 
 -- | Final variables do not get Alpha remaned - use with caution.

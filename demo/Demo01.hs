@@ -22,7 +22,7 @@ demo01  = main2 opts ["test/Instr1.oboe"]
 
 
 demo02 = do 
-    ans <- parseModule "test/Instr1.oboe"
+    ans <- parseRootModule "test/Instr1.oboe"
     case ans of 
       Left err -> print err
       Right mod1 -> do { print $ pretty mod1
